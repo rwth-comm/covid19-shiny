@@ -48,25 +48,8 @@ ui <-
                             title = "Empty",
                             textOutput("error")
                             )
-                    
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        
                     )
                 
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                 ),
                 tabItem(tabName = "widgets", 
                     fluidRow(
