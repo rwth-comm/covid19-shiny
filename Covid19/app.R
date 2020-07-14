@@ -4,6 +4,8 @@ library(shiny)
 library(tidyverse)
 library(lubridate)
 library(gghighlight)
+library(plotly)
+library(ggthemes)
 
 raw <- read_csv("https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e40168479a1feb6c7ca74/data") %>% 
     mutate(Meldedatum = as_date(Meldedatum)) %>% 
@@ -21,7 +23,7 @@ ui <-
     dashboardPage(
         dashboardHeader(title = "Basic dashboard"),
         dashboardSidebar(
-            sidebarMenu(
+            sidebarMenu(id = "unserTabSet",
                 menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
                 menuItem("Widgets", tabName = "widgets", icon = icon("address-book"))
             )
@@ -32,21 +34,27 @@ ui <-
                     fluidRow(
                         box( width = 8,
                              title = "Fälle pro Tag",
-                             plotOutput("plot1"),
+                             plotlyOutput("plot1"),
                              plotOutput("plotDetail"),
-                             plotOutput("plotSumme")
+                             plotOutput("plotSumme", 
+                                        hover = hoverOpts(id = "plot_hover", delayType = "debounce"),
+                                        brush = brushOpts(id = "plot_brush", direction = "x")),
+                             plotOutput("unser_brush")
                         ),
-                        
                         box(
                             width = 4, 
                             title = "Controls",
                             selectInput("lk_selector", "Landkreis auswählen", choices = lks),
-                            selectInput("age_selector", "Altersgruppe auswählen", choices = ages)
+                            selectInput("age_selector", "Altersgruppe auswählen", choices = ages),
+                            checkboxInput("facet_plot_yes_no", "Plot facetieren?", value = FALSE),
+                            selectInput("theme_selector", "Theme auswählen", choices = c("bw", "economist", "fivethirtyeight")),
+                            actionButton("dashboard_next", "Weiter")
                         ),
                         
                         box(width = 8,
                             title = "Empty",
-                            textOutput("error")
+                            textOutput("error"),
+                            verbatimTextOutput("debug")
                             )
                     )
                 
@@ -76,17 +84,30 @@ ui <-
         )
     )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
 
+    
+    observeEvent(input$dashboard_next, {
+        updateTabItems(session, "unserTabSet", "widgets")
+    })
+    
     
     lk_daten <- reactive({
         raw %>% 
             filter(Landkreis == input$lk_selector)
     })
     
+    cumulative_daten <- reactive({
+        lk_daten() %>% 
+            group_by(Meldedatum) %>% 
+            summarise(AnzahlFall = sum(AnzahlFall)) %>% 
+            mutate(AlleFaelle = cumsum(AnzahlFall))
+    })
+    
 
-    output$plot1 <- renderPlot({
-       lk_daten() %>% 
+    output$plot1 <- renderPlotly({
+        
+       plt <- lk_daten() %>% 
             ggplot() +
             aes(x = Meldedatum) +
             aes(y = AnzahlFall) +
@@ -94,6 +115,24 @@ server <- function(input, output) {
             geom_col() +
             labs(title = "Anzahl Fälle pro Tag",
                  x = "Datum", y = "Anzahl Fälle")
+       
+       if(input$facet_plot_yes_no){
+           plt <- plt + facet_wrap(~Altersgruppe)
+        }
+       
+       if(input$theme_selector == "bw") {
+           plt <- plt + theme_bw()
+       }    
+       if(input$theme_selector == "economist") {
+           plt <- plt + theme_economist()
+       }    
+       if(input$theme_selector == "fivethirtyeight") {
+           plt <- plt + theme_fivethirtyeight()
+       }    
+       
+       
+        
+        plotly::ggplotly(p = plt)
         
     })
 
@@ -113,10 +152,7 @@ server <- function(input, output) {
 
     
     output$plotSumme <- renderPlot({
-        lk_daten() %>% 
-            group_by(Meldedatum) %>% 
-            summarise(AnzahlFall = sum(AnzahlFall)) %>% 
-            mutate(AlleFaelle = cumsum(AnzahlFall)) %>% 
+        cumulative_daten() %>% 
             ggplot() +
             aes(x = Meldedatum) +
             aes(y = AlleFaelle) +
@@ -126,6 +162,28 @@ server <- function(input, output) {
         
     })
     
+    
+    output$debug <- renderPrint({
+        str(input$plot_hover)
+        cat(str(input$plot_hover))
+    })
+    
+    output$unser_brush <- renderPlot({
+        
+        ausgewaehlte_daten <- brushedPoints(cumulative_daten(), input$plot_brush, "Meldedatum", "AlleFaelle")
+        
+        hover_daten <- nearPoints(cumulative_daten(), input$plot_hover)
+        
+        cumulative_daten() %>% 
+            filter(Meldedatum %in% ausgewaehlte_daten$Meldedatum) %>% 
+            ggplot() +
+            aes(x = Meldedatum) +
+            aes(y = AnzahlFall) +
+            geom_col() +
+            labs(title = "Anzahl Fälle pro Tag",
+                 x = "Datum", y = "Anzahl Fälle") +
+            gghighlight(Meldedatum %in% hover_daten$Meldedatum)
+    })
     
 }
 

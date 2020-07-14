@@ -1,0 +1,12 @@
+name: Covid19
+title: Covid19
+username:
+account: andrecalerovaldez
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2488857
+bundleId: 3302465
+url: https://andrecalerovaldez.shinyapps.io/Covid19/
+when: 1592840079.4054
+asMultiple: FALSE
+asStatic: FALSE
