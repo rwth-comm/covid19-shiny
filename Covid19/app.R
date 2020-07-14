@@ -17,6 +17,13 @@ raw <- read_csv("https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e4
 #raw %>% filter(Landkreis == "StadtRegion Aachen") %>% group_by(Meldedatum) %>% summarise(AnzahlFall = sum(AnzahlFall))
 
 
+selectable <- function(x)
+{
+    is.numeric(x) | is.Date(x)
+}
+
+our_variables <- names(raw %>% select_if(selectable))
+
 lks <- raw$Landkreis %>% unique() %>% sort()
 ages <- raw$Altersgruppe %>% unique() %>% sort()
 
@@ -38,6 +45,10 @@ ui <-
                 # UI Tabs dashboard ----
                 tabItem(tabName = "dashboard",
                     fluidRow(
+                        box( width = 8,
+                             plotOutput("demovariablen"),
+                             selectInput("varselect", "Variable auswählen", our_variables)
+                             ),
                         box( width = 8,
                              title = "Fälle pro Tag",
                              plotlyOutput("plot1"),
@@ -174,8 +185,13 @@ server <- function(input, output, session) {
         
     })
     
-    
-    
+    # UI HIER BIN ICH DRAN ----
+    output$demovariablen <- renderPlot({
+        req(input$varselect)
+        raw %>% ggplot() +
+            aes_string(x = input$varselect) +
+            geom_histogram()
+    })
     
     output$unser_brush <- renderPlot({
         
