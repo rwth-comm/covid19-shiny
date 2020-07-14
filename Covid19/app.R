@@ -1,4 +1,4 @@
-## app.R ##
+## app.R ## ----
 library(shinydashboard)
 library(shiny)
 library(tidyverse)
@@ -6,6 +6,8 @@ library(lubridate)
 library(gghighlight)
 library(plotly)
 library(ggthemes)
+
+# Daten laden ----
 
 raw <- read_csv("https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e40168479a1feb6c7ca74/data") %>% 
     mutate(Meldedatum = as_date(Meldedatum)) %>% 
@@ -18,10 +20,12 @@ raw <- read_csv("https://www.arcgis.com/sharing/rest/content/items/f10774f1c63e4
 lks <- raw$Landkreis %>% unique() %>% sort()
 ages <- raw$Altersgruppe %>% unique() %>% sort()
 
-
+# UI Begin ----
 ui <- 
     dashboardPage(
+        # UI Header ----
         dashboardHeader(title = "Basic dashboard"),
+        # UI Menu ----
         dashboardSidebar(
             sidebarMenu(id = "unserTabSet",
                 menuItem("Dashboard", tabName = "dashboard", icon = icon("dashboard")),
@@ -29,7 +33,9 @@ ui <-
             )
         ),
         dashboardBody(
+            # UI Tabs ----
             tabItems(
+                # UI Tabs dashboard ----
                 tabItem(tabName = "dashboard",
                     fluidRow(
                         box( width = 8,
@@ -59,6 +65,7 @@ ui <-
                     )
                 
                 ),
+                # UI Tabs widgets ----
                 tabItem(tabName = "widgets", 
                     fluidRow(
                         box(width = 12,
@@ -86,12 +93,15 @@ ui <-
 
 server <- function(input, output, session) {
 
-    
+    # Event Management ----
+    # Event Button Weiter ----
     observeEvent(input$dashboard_next, {
         updateTabItems(session, "unserTabSet", "widgets")
     })
     
     
+    
+    # Reactive Data ----
     lk_daten <- reactive({
         raw %>% 
             filter(Landkreis == input$lk_selector)
@@ -105,6 +115,8 @@ server <- function(input, output, session) {
     })
     
 
+    # PO - Plot Outputs ----
+    # PO Dashboard - main plot ----
     output$plot1 <- renderPlotly({
         
        plt <- lk_daten() %>% 
@@ -136,7 +148,7 @@ server <- function(input, output, session) {
         
     })
 
-    
+    # PO Dashboard - details ----
     output$plotDetail <- renderPlot({
         lk_daten() %>% 
             ggplot() +
@@ -163,10 +175,7 @@ server <- function(input, output, session) {
     })
     
     
-    output$debug <- renderPrint({
-        str(input$plot_hover)
-        cat(str(input$plot_hover))
-    })
+    
     
     output$unser_brush <- renderPlot({
         
@@ -184,6 +193,14 @@ server <- function(input, output, session) {
                  x = "Datum", y = "Anzahl Fälle") +
             gghighlight(Meldedatum %in% hover_daten$Meldedatum)
     })
+    
+    
+    # Debug output ----
+    output$debug <- renderPrint({
+        str(input$plot_hover)
+        cat(str(input$plot_hover))
+    })
+    
     
 }
 
